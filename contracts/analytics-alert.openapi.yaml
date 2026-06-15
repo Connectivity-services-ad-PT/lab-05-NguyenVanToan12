@@ -1,0 +1,340 @@
+openapi: 3.1.0
+
+info:
+  title: Smart Campus Alert & Analytics API
+  version: 1.0.0
+  description: REST API and Webhook event definitions for the Smart Campus Alert & Analytics system.
+  contact:
+    name: FIT4110 Teaching Team
+    email: fit4110@example.edu.vn
+
+servers:
+  - url: http://localhost:4010
+    description: Prism mock server
+
+tags:
+  - name: health
+    description: Kiểm tra trạng thái service
+  - name: alerts
+    description: Quản lý cảnh báo Smart Campus
+  - name: events
+    description: Hợp đồng sự kiện bất đồng bộ
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /health:
+    get:
+      summary: Kiểm tra sức khỏe hệ thống
+      description: Kiểm tra xem dịch vụ có đang hoạt động ổn định hay không.
+      operationId: getHealth
+      tags:
+        - health
+      security: []
+      responses:
+        '200':
+          description: Dịch vụ hoạt động bình thường
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /alerts/recent:
+    get:
+      summary: Lấy danh sách các cảnh báo gần đây
+      description: Trả về danh sách cảnh báo mới nhất sử dụng phân trang Cursor-based pagination.
+      operationId: getRecentAlerts
+      tags:
+        - alerts
+      parameters:
+        - name: limit
+          in: query
+          description: Số lượng bản ghi tối đa muốn lấy
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: cursor
+          in: query
+          description: Con trỏ dùng để phân trang cho trang kế tiếp
+          required: false
+          schema:
+            type:
+              - string
+              - "null"
+      responses:
+        '200':
+          description: Danh sách cảnh báo gần đây thành công
+          headers:
+            X-Next-Cursor:
+              description: Con trỏ chỉ đến trang dữ liệu kế tiếp (nếu có)
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Alert'
+        '401':
+          description: Chưa xác thực tài khoản
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: Không có quyền truy cập
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /alerts:
+    post:
+      summary: Tạo cảnh báo mới
+      description: Tạo một cảnh báo bảo mật hoặc khẩn cấp mới trên Smart Campus.
+      operationId: createAlert
+      tags:
+        - alerts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAlertRequest'
+      responses:
+        '201':
+          description: Cảnh báo được tạo thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+        '400':
+          description: Dữ liệu gửi lên sai định dạng
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Chưa xác thực tài khoản
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /alerts/{alertId}:
+    get:
+      summary: Lấy chi tiết cảnh báo theo ID
+      description: Trả về thông tin chi tiết của một cảnh báo cụ thể. Hỗ trợ đa hình polymorphism qua discriminator.
+      operationId: getAlertById
+      tags:
+        - alerts
+      parameters:
+        - name: alertId
+          in: path
+          description: ID duy nhất của cảnh báo cần lấy thông tin
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chi tiết cảnh báo thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertDetail'
+              examples:
+                fire_alert:
+                  value:
+                    alertType: FIRE
+                    id: ALT-001
+                    location: LAB-401
+                    temperature: 85.5
+                security_alert:
+                  value:
+                    alertType: SECURITY
+                    id: ALT-002
+                    cameraId: CAM-GATE-01
+                    suspectDetected: true
+        '401':
+          description: Chưa xác thực tài khoản
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: Không tìm thấy cảnh báo yêu cầu
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+webhooks:
+  onAlertCreated:
+    description: Sự kiện webhook phát ra khi có một cảnh báo mới được hệ thống ghi nhận.
+    post:
+      summary: Nhận thông báo sự kiện cảnh báo mới
+      operationId: handleAlertWebhook
+      tags:
+        - events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Alert'
+      responses:
+        '200':
+          description: Nhận thông báo thành công và đã xử lý xong.
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: UP
+
+    Alert:
+      type: object
+      required:
+        - id
+        - alertType
+        - severity
+        - message
+      properties:
+        id:
+          type: string
+          example: ALT-0196fb3d-bcd7-7d1e-9f49-5d5148d2b666
+        alertType:
+          type: string
+          example: UNAUTHORIZED_ACCESS
+        severity:
+          type: string
+          enum:
+            - LOW
+            - MEDIUM
+            - HIGH
+        message:
+          type: string
+          example: Phat hien truy cap trai phep tai cong chinh
+        relatedEventId:
+          type:
+            - string
+            - "null"
+          example: "0196fb3d-4ad7-7d1e-9f49-5d5148d2babc"
+
+    CreateAlertRequest:
+      type: object
+      required:
+        - sourceService
+        - alertType
+        - severity
+        - message
+      properties:
+        sourceService:
+          type: string
+          example: core-business
+        alertType:
+          type: string
+          example: UNAUTHORIZED_ACCESS
+        severity:
+          type: string
+          enum:
+            - LOW
+            - MEDIUM
+            - HIGH
+        message:
+          type: string
+          example: Phat hien truy cap trai phep tai cong chinh
+        relatedEventId:
+          type:
+            - string
+            - "null"
+          example: "0196fb3d-4ad7-7d1e-9f49-5d5148d2babc"
+
+    AlertDetail:
+      oneOf:
+        - $ref: '#/components/schemas/FireAlert'
+        - $ref: '#/components/schemas/SecurityAlert'
+      discriminator:
+        propertyName: alertType
+
+    FireAlert:
+      type: object
+      required:
+        - alertType
+        - id
+        - location
+        - temperature
+      properties:
+        alertType:
+          type: string
+          const: FIRE
+        id:
+          type: string
+          example: ALT-001
+        location:
+          type: string
+          example: LAB-401
+        temperature:
+          type: number
+          example: 85.5
+
+    SecurityAlert:
+      type: object
+      required:
+        - alertType
+        - id
+        - cameraId
+        - suspectDetected
+      properties:
+        alertType:
+          type: string
+          const: SECURITY
+        id:
+          type: string
+          example: ALT-002
+        cameraId:
+          type: string
+          example: CAM-GATE-01
+        suspectDetected:
+          type: boolean
+          example: true
+
+    Problem:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+      properties:
+        type:
+          type: string
+          format: uri
+          example: "https://api.smartcampus.edu.vn/errors/unauthorized"
+        title:
+          type: string
+          example: Unauthorized Access
+        status:
+          type: integer
+          example: 401
+        detail:
+          type: string
+          example: Token cung cap khong hop le hoac da het han.

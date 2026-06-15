@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Analytics &amp; Alert API Contract Tests" tests="17" time="0.463">
+  <testsuite name="00_Health / GET /health - Service health check" id="7f6b8aa2-c811-44e0-b275-c6fc61ccf5b9" timestamp="2026-06-15T15:15:50.471Z" tests="2" failures="0" errors="0" time="0.080">
+    <testcase name="Status code is 200" time="0.080" classname="00HealthGetHealthServiceHealthCheck"/>
+    <testcase name="Response returns UP" time="0.080" classname="00HealthGetHealthServiceHealthCheck"/>
+  </testsuite>
+  <testsuite name="01_Functional / POST /alerts - Happy path creates alert" id="e1b94566-640d-4fa0-ac3f-0e1cc42f6940" timestamp="2026-06-15T15:15:50.471Z" tests="2" failures="0" errors="0" time="0.033">
+    <testcase name="Status code is 201" time="0.033" classname="01FunctionalPostAlertsHappyPathCreatesAlert"/>
+    <testcase name="Response has alert fields" time="0.033" classname="01FunctionalPostAlertsHappyPathCreatesAlert"/>
+  </testsuite>
+  <testsuite name="01_Functional / GET /alerts/recent - Get latest alerts" id="64d161b1-4ad1-4731-b494-5a2b2029a11b" timestamp="2026-06-15T15:15:50.471Z" tests="2" failures="0" errors="0" time="0.034">
+    <testcase name="Status code is 200" time="0.034" classname="01FunctionalGetAlertsRecentGetLatestAlerts"/>
+    <testcase name="Response contains array and pagination header" time="0.034" classname="01FunctionalGetAlertsRecentGetLatestAlerts"/>
+  </testsuite>
+  <testsuite name="01_Functional / GET /alerts/{id} - Get FireAlert detail (Polymorphism)" id="f5611f54-dbfc-49c2-b5f2-44fd10a7cccb" timestamp="2026-06-15T15:15:50.471Z" tests="2" failures="0" errors="0" time="0.032">
+    <testcase name="Status code is 200" time="0.032" classname="01FunctionalGetAlertsIdGetFireAlertDetailPolymorphism"/>
+    <testcase name="Response is a FireAlert" time="0.032" classname="01FunctionalGetAlertsIdGetFireAlertDetailPolymorphism"/>
+  </testsuite>
+  <testsuite name="01_Functional / GET /alerts/{id} - Get SecurityAlert detail (Polymorphism)" id="287ecb6e-ab17-4fbd-a766-737e42b07c3d" timestamp="2026-06-15T15:15:50.471Z" tests="2" failures="0" errors="0" time="0.032">
+    <testcase name="Status code is 200" time="0.032" classname="01FunctionalGetAlertsIdGetSecurityAlertDetailPolymorphism"/>
+    <testcase name="Response is a SecurityAlert" time="0.032" classname="01FunctionalGetAlertsIdGetSecurityAlertDetailPolymorphism"/>
+  </testsuite>
+  <testsuite name="02_Auth / GET /alerts/recent - Authorized request accepted" id="3ae7f546-a8db-4a68-893d-23a503b4a67e" timestamp="2026-06-15T15:15:50.471Z" tests="1" failures="0" errors="0" time="0.030">
+    <testcase name="Authorized request returns 200" time="0.030" classname="02AuthGetAlertsRecentAuthorizedRequestAccepted"/>
+  </testsuite>
+  <testsuite name="02_Auth / POST /alerts - Missing token rejected on local service" id="b1ca20a0-862f-4ade-b681-3427b5b2d449" timestamp="2026-06-15T15:15:50.471Z" tests="1" failures="0" errors="0" time="0.005">
+    <testcase name="Missing token returns 401 or 403" time="0.005" classname="02AuthPostAlertsMissingTokenRejectedOnLocalService"/>
+  </testsuite>
+  <testsuite name="02_Auth / POST /alerts - Invalid token rejected on local service" id="12f9a11d-4e96-4b84-bdeb-a1acdc799f21" timestamp="2026-06-15T15:15:50.471Z" tests="1" failures="0" errors="0" time="0.004">
+    <testcase name="Invalid token returns 401 or 403" time="0.004" classname="02AuthPostAlertsInvalidTokenRejectedOnLocalService"/>
+  </testsuite>
+  <testsuite name="03_Negative / POST /alerts - Missing required fields returns validation error" id="33723c9c-0e52-472a-a05b-0700b2a84a9a" timestamp="2026-06-15T15:15:50.471Z" tests="2" failures="0" errors="0" time="0.004">
+    <testcase name="Missing required fields returns 400 client error" time="0.004" classname="03NegativePostAlertsMissingRequiredFieldsReturnsValidationError"/>
+    <testcase name="Error response follows ProblemDetails schema" time="0.004" classname="03NegativePostAlertsMissingRequiredFieldsReturnsValidationError"/>
+  </testsuite>
+  <testsuite name="03_Negative / POST /alerts - Invalid enum value for severity" id="f90baab9-07f7-44f9-8278-9700f7064c03" timestamp="2026-06-15T15:15:50.471Z" tests="2" failures="0" errors="0" time="0.007">
+    <testcase name="Invalid enum returns client error" time="0.007" classname="03NegativePostAlertsInvalidEnumValueForSeverity"/>
+    <testcase name="Error response has detail message" time="0.007" classname="03NegativePostAlertsInvalidEnumValueForSeverity"/>
+  </testsuite>
+  <testsuite name="03_Negative / GET /alerts/{id} - Alert ID not found returns 404" id="d8888742-7913-4759-9f17-0e33694a335a" timestamp="2026-06-15T15:15:50.471Z" tests="2" failures="0" errors="0" time="0.035">
+    <testcase name="Non-existing alert ID returns 404" time="0.035" classname="03NegativeGetAlertsIdAlertIdNotFoundReturns404"/>
+    <testcase name="Response follows ProblemDetails structure" time="0.035" classname="03NegativeGetAlertsIdAlertIdNotFoundReturns404"/>
+  </testsuite>
+  <testsuite name="04_Boundary_Reliability / GET /alerts/recent - limit negative is rejected" id="87116153-9758-4bbb-818d-272e9816f129" timestamp="2026-06-15T15:15:50.471Z" tests="1" failures="0" errors="0" time="0.004">
+    <testcase name="Negative limit returns client error" time="0.004" classname="04BoundaryReliabilityGetAlertsRecentLimitNegativeIsRejected"/>
+  </testsuite>
+  <testsuite name="04_Boundary_Reliability / GET /alerts/recent - limit above max is rejected" id="142a23da-f039-4e5f-8d30-ef84eb9620d9" timestamp="2026-06-15T15:15:50.471Z" tests="1" failures="0" errors="0" time="0.003">
+    <testcase name="Limit above max returns client error" time="0.003" classname="04BoundaryReliabilityGetAlertsRecentLimitAboveMaxIsRejected"/>
+  </testsuite>
+  <testsuite name="05_Consumer_side_Smoke / Consumer smoke - Ingest IoT Telemetry event (Pair 06)" id="f0d89c26-5a28-4e21-8ced-8fb64a2dd125" timestamp="2026-06-15T15:15:50.471Z" tests="2" failures="0" errors="0" time="0.069">
+    <testcase name="Consumer receives success from IoT Ingestion mock" time="0.069" classname="05ConsumerSideSmokeConsumerSmokeIngestIoTTelemetryEventPair06"/>
+    <testcase name="Consumer can parse telemetry response" time="0.069" classname="05ConsumerSideSmokeConsumerSmokeIngestIoTTelemetryEventPair06"/>
+  </testsuite>
+  <testsuite name="05_Consumer_side_Smoke / Consumer smoke - Receive Camera Motion event (Pair 07)" id="2ab6d1b4-c990-4225-84c6-de51f0a8f6b4" timestamp="2026-06-15T15:15:50.471Z" tests="2" failures="0" errors="0" time="0.030">
+    <testcase name="Status code is 201" time="0.030" classname="05ConsumerSideSmokeConsumerSmokeReceiveCameraMotionEventPair07"/>
+    <testcase name="Correctly maps event correlation details" time="0.030" classname="05ConsumerSideSmokeConsumerSmokeReceiveCameraMotionEventPair07"/>
+  </testsuite>
+  <testsuite name="05_Consumer_side_Smoke / Consumer smoke - Ingest Access Log event (Pair 09)" id="9e701251-742e-4b67-84f3-e75cd367dcf4" timestamp="2026-06-15T15:15:50.471Z" tests="2" failures="0" errors="0" time="0.029">
+    <testcase name="Status code is 201" time="0.029" classname="05ConsumerSideSmokeConsumerSmokeIngestAccessLogEventPair09"/>
+    <testcase name="Includes CardHash reference in message" time="0.029" classname="05ConsumerSideSmokeConsumerSmokeIngestAccessLogEventPair09"/>
+  </testsuite>
+  <testsuite name="06_Local_only_NonFunctional / GET /alerts/recent - response latency check" id="109e3c73-6839-4653-9f46-86cdbea3d058" timestamp="2026-06-15T15:15:50.471Z" tests="1" failures="0" errors="0" time="0.032">
+    <testcase name="Local service responds under 1000ms" time="0.032" classname="06LocalOnlyNonFunctionalGetAlertsRecentResponseLatencyCheck"/>
+  </testsuite>
+</testsuites>

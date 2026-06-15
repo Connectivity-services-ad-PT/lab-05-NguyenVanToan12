@@ -1,114 +1,100 @@
-# RUN_COMPOSE.md – Hướng dẫn chạy Lab 05
+# RUN_COMPOSE.md – Hướng dẫn chạy Lab 05 (Team Analytics)
 
-Tài liệu này hướng dẫn người khác clone repo sạch và chạy lại stack Compose của Lab 05.
-
----
-
-## 1. Clone repo
-
-```bash
-git clone <repo-url>
-cd FIT4110_lab05_docker_compose_readiness
-```
+Tài liệu này hướng dẫn cách chạy và kiểm thử toàn bộ stack Docker Compose của dịch vụ **Analytics & Alert** (Team Analytics) tích hợp cùng cơ sở dữ liệu **TimescaleDB** và **AI service** (mock).
 
 ---
 
-## 2. Cài dependencies cho Newman/Prism/Spectral (tuỳ chọn)
-
+## 1. Chuẩn bị tài nguyên
+Sao chép tệp cấu hình `.env.example` thành `.env` tại thư mục gốc của repo:
 ```bash
-npm install
-```
-
----
-
-## 3. Build & chạy stack Docker Compose
-
-```bash
-# Copy .env.example sang .env và chỉnh sửa nếu cần
 cp .env.example .env
+```
+Bạn có thể mở tệp `.env` lên để cấu hình lại các thông số nếu cần (ví dụ: `APP_PORT`, `AUTH_TOKEN`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`).
 
-# Build images (nếu chưa có) và khởi động các container trong nền
+---
+
+## 2. Khởi chạy Docker Compose Stack
+Sử dụng Makefile hoặc lệnh trực tiếp Docker Compose để build và chạy toàn bộ các service dưới nền:
+```bash
+# Sử dụng Makefile
+make compose-up
+
+# Hoặc dùng lệnh trực tiếp
 docker compose up -d --build
 ```
 
-Lệnh trên sẽ tạo các container:
+Lệnh trên sẽ khởi chạy 3 container:
+- `fit4110-db-lab05` (TimescaleDB chạy ở cổng 5432)
+- `fit4110-ai-lab05` (Mock AI service chạy ở cổng 9000)
+- `fit4110-api-lab05` (FastAPI Analytics & Alert API chạy ở cổng 8000)
 
-- `fit4110-db-lab05` (PostgreSQL)
-- `fit4110-ai-lab05` (AI service mẫu chạy port 9000)
-- `fit4110-api-lab05` (API FastAPI trên port 8000)
-
-Theo dõi log:
-
+Theo dõi logs của toàn bộ stack hoặc riêng API để kiểm tra xem quá trình kết nối DB và khởi tạo bảng có thành công không:
 ```bash
-docker compose logs -f
+make logs
+# Hoặc
+docker logs -f fit4110-api-lab05
 ```
 
-Sau vài giây, kiểm tra health của mỗi service:
+---
 
+## 3. Kiểm chứng trạng thái hoạt động (Readiness & Health)
+
+### A. Kiểm tra API Health
+FastAPI Analytics service sẽ tự động kiểm tra kết nối tới TimescaleDB và gọi thử AI mock service khi bạn truy cập `/health`. Nếu cả hai service liên quan hoạt động tốt, endpoint sẽ trả về trạng thái `UP` với code 200:
 ```bash
-# API
 curl http://localhost:8000/health
+# Phản hồi: {"status":"UP"}
+```
 
-# AI service
+### B. Kiểm tra database TimescaleDB
+Kiểm tra xem database Postgres/TimescaleDB đã sẵn sàng chấp nhận các kết nối chưa:
+```bash
+docker exec -it fit4110-db-lab05 pg_isready -U lab05 -d iotdb
+```
+
+### C. Kiểm tra AI Service
+Kiểm tra health và kết quả dự đoán của mô hình AI mock:
+```bash
+# Healthcheck
 curl http://localhost:9000/health
 
-# DB readiness
-docker exec -it fit4110-db-lab05 pg_isready -U $POSTGRES_USER
-```
-
-Bạn cũng có thể truy cập endpoint `/predict` của AI service để xem kết quả mẫu:
-
-```bash
+# Dự đoán thử
 curl -X POST http://localhost:9000/predict
 ```
 
 ---
 
-## 4. Chạy Newman test trên stack Compose (tuỳ chọn)
+## 4. Chạy bộ kiểm thử tự động Newman
 
-```bash
-npm run test:compose
-```
+Bộ kiểm thử Newman sẽ chạy các bài kiểm tra API (functional, auth, negative, boundary, polymorphism, consumer smoke).
 
-Report sinh tại:
+Để chạy tests:
+1. Cài đặt các thư viện Node.js:
+   ```bash
+   npm install
+   ```
+2. Chạy mock server cho IoT Ingestion phục vụ cho bài test consumer smoke (bởi vì kiểm thử tích hợp yêu cầu gọi sang cổng telemetry):
+   ```bash
+   # Chạy Prism mock ở cổng 4011 dưới nền
+   npm run mock:iot
+   ```
+3. Khởi chạy Newman:
+   ```bash
+   npm run test:compose
+   ```
 
-```text
-reports/newman-lab05-compose.xml
-reports/newman-lab05-compose.html
-```
+Báo cáo kiểm thử (Newman Reports) sẽ được xuất ra dưới định dạng HTML và JUnit XML tại thư mục:
+- `reports/newman-lab05-compose.html`
+- `reports/newman-lab05-compose.xml`
 
 ---
 
-## 5. Dừng stack
-
-Khi không cần nữa, dừng và xoá các container bằng:
-
+## 5. Dừng hệ thống
+Để tắt toàn bộ container:
 ```bash
-docker compose down
+make compose-down
 ```
-
-Nếu muốn xoá volume dữ liệu của DB, thêm tuỳ chọn `-v`:
-
+Nếu muốn xoá sạch các volume dữ liệu được lưu trữ trong TimescaleDB:
 ```bash
 docker compose down -v
 ```
-
----
-
-## 6. Lệnh nhanh
-
-Bạn có thể dùng Makefile:
-
-```bash
-make compose-up
-make compose-down
-make logs
-```
-
----
-
-## 7. Mẹo gỡ lỗi
-
-- Sử dụng `docker compose ps` để xem trạng thái container.
-- Nếu API trả lỗi kết nối DB, hãy kiểm tra biến môi trường `POSTGRES_*` trong `.env` và đảm bảo DB đã sẵn sàng (`pg_isready`).
-- Nếu AI service cần tải mô hình lớn, tăng `start_period` của healthcheck trong `docker-compose.yml`.

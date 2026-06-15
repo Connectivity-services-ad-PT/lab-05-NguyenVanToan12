@@ -9,6 +9,13 @@ services:
     container_name: fit4110-api-lab05
     env_file:
       - .env
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-lab05}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-lab05pass}
+      - POSTGRES_DB=${POSTGRES_DB:-iotdb}
+      - AI_SERVICE_URL=http://ai-service:9000
     depends_on:
       db:
         condition: service_healthy
@@ -26,9 +33,9 @@ services:
       retries: 3
       start_period: 10s
 
-  # PostgreSQL database service
+  # TimescaleDB database service
   db:
-    image: postgres:15-alpine
+    image: timescale/timescaledb:latest-pg15
     container_name: fit4110-db-lab05
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-lab05}
@@ -39,7 +46,7 @@ services:
     networks:
       - team-internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lab05}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lab05} -d ${POSTGRES_DB:-iotdb}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,7 +58,7 @@ services:
     working_dir: /service
     volumes:
       - ./src/ai_service:/service
-    command: ["python", "main.py"]
+    command: ["sh", "-c", "pip install --no-cache-dir fastapi uvicorn pydantic requests && python main.py"]
     networks:
       - team-internal
     healthcheck:

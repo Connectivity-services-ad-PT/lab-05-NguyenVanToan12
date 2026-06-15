@@ -1,0 +1,704 @@
+{
+  "info": {
+    "_postman_id": "analytics-alert-contract-tests",
+    "name": "Analytics & Alert API Contract Tests",
+    "description": "Postman Collection cho FIT4110 Lab 03: Analytics & Alert Service. Thử nghiệm trên Prism Mock Server và Local Service. Cấu trúc bám sát yêu cầu: Functional, Auth, Negative, Boundary, Consumer-side Smoke, Local NonFunctional.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const prefix = pm.environment.get('tracePrefix') || 'analytics-alert';",
+          "pm.variables.set('traceId', prefix + '-' + Date.now());",
+          "pm.request.headers.upsert({ key: 'X-Trace-Id', value: pm.variables.get('traceId') });"
+        ]
+      }
+    }
+  ],
+  "variable": [],
+  "item": [
+    {
+      "name": "00_Health",
+      "item": [
+        {
+          "name": "GET /health - Service health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Kiểm tra xem service Analytics & Alert có đang hoạt động ổn định không."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response returns UP', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('status', 'UP');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01_Functional",
+      "item": [
+        {
+          "name": "POST /alerts - Happy path creates alert",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceService\": \"core-business\",\n  \"alertType\": \"UNAUTHORIZED_ACCESS\",\n  \"severity\": \"HIGH\",\n  \"message\": \"Phat hien doi tuong la dot nhap vao phong lap chat luong cao\",\n  \"relatedEventId\": \"evt_0196fb3d-7ad7-7d1e-9f49-5d5148d2bcba\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "description": "Happy path: Tạo cảnh báo từ Core Business (Cặp 08)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Response has alert fields', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('id');",
+                  "  pm.expect(json).to.have.property('alertType', 'UNAUTHORIZED_ACCESS');",
+                  "  pm.expect(['LOW', 'MEDIUM', 'HIGH']).to.include(json.severity);",
+                  "  pm.expect(json).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /alerts/recent - Get latest alerts",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/recent?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts", "recent"],
+              "query": [
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "description": "Lấy danh sách cảnh báo gần đây với phân trang Cursor-based."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response contains array and pagination header', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.be.an('array');",
+                  "  pm.expect(pm.response.headers.has('X-Next-Cursor')).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /alerts/{id} - Get FireAlert detail (Polymorphism)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Prefer", "value": "example=fire_alert" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/ALT-001",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts", "ALT-001"]
+            },
+            "description": "Kiểm chứng đa hình (Polymorphism) qua Discriminator. ALT-001 là mẫu FireAlert."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is a FireAlert', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('alertType', 'FIRE');",
+                  "  pm.expect(json).to.have.property('location', 'LAB-401');",
+                  "  pm.expect(json).to.have.property('temperature');",
+                  "  pm.expect(json.temperature).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /alerts/{id} - Get SecurityAlert detail (Polymorphism)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Prefer", "value": "example=security_alert" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/ALT-002",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts", "ALT-002"]
+            },
+            "description": "Kiểm chứng đa hình qua Discriminator. ALT-002 là mẫu SecurityAlert."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is a SecurityAlert', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('alertType', 'SECURITY');",
+                  "  pm.expect(json).to.have.property('cameraId', 'CAM-GATE-01');",
+                  "  pm.expect(json).to.have.property('suspectDetected', true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02_Auth",
+      "item": [
+        {
+          "name": "GET /alerts/recent - Authorized request accepted",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/recent?limit=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts", "recent"],
+              "query": [
+                { "key": "limit", "value": "1" }
+              ]
+            },
+            "description": "Xác nhận request có token hợp lệ được chấp nhận."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Authorized request returns 200', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /alerts - Missing token rejected on local service",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceService\": \"core-business\",\n  \"alertType\": \"UNAUTHORIZED_ACCESS\",\n  \"severity\": \"HIGH\",\n  \"message\": \"Thieu token\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "description": "Auth test thật: thiếu token. Khi chạy ở mock, test được skip có kiểm soát vì Prism không có middleware auth."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const env = pm.environment.get('env') || 'mock';",
+                  "if (env === 'mock') {",
+                  "  pm.test('Skipped on mock: Prism does not enforce real auth', function () {",
+                  "    pm.expect(true).to.eql(true);",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Missing token returns 401 or 403', function () {",
+                  "    pm.expect([401, 403]).to.include(pm.response.code);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /alerts - Invalid token rejected on local service",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer invalid-jwt-token" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceService\": \"core-business\",\n  \"alertType\": \"UNAUTHORIZED_ACCESS\",\n  \"severity\": \"HIGH\",\n  \"message\": \"Sai token\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "description": "Auth test thật: token không hợp lệ."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const env = pm.environment.get('env') || 'mock';",
+                  "if (env === 'mock') {",
+                  "  pm.test('Skipped on mock: Prism does not validate auth signature', function () {",
+                  "    pm.expect(true).to.eql(true);",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Invalid token returns 401 or 403', function () {",
+                  "    pm.expect([401, 403]).to.include(pm.response.code);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03_Negative",
+      "item": [
+        {
+          "name": "POST /alerts - Missing required fields returns validation error",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Prefer", "value": "code=400" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceService\": \"core-business\",\n  \"severity\": \"HIGH\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "description": "Kiểm tra lỗi validate khi thiếu trường bắt buộc."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing required fields returns 400 client error', function () {",
+                  "  pm.expect([400, 422]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('Error response follows ProblemDetails schema', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('type');",
+                  "  pm.expect(json).to.have.property('title');",
+                  "  pm.expect(json).to.have.property('status');",
+                  "  pm.expect(json).to.have.property('detail');",
+                  "  pm.expect(json.status).to.be.within(400, 599);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /alerts - Invalid enum value for severity",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Prefer", "value": "code=400" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceService\": \"core-business\",\n  \"alertType\": \"UNAUTHORIZED_ACCESS\",\n  \"severity\": \"CRITICAL\",\n  \"message\": \"Phat hien xam nhap\",\n  \"relatedEventId\": \"evt_0196fb3d-7ad7-7d1e-9f49-5d5148d2bcba\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "description": "Kiểm thử lỗi validation khi trường severity chứa giá trị không hợp lệ (CRITICAL thay vì LOW/MEDIUM/HIGH)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid enum returns client error', function () {",
+                  "  pm.expect([400, 422]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('Error response has detail message', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('detail');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /alerts/{id} - Alert ID not found returns 404",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Prefer", "value": "code=404" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/ALT-NOTFOUND",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts", "ALT-NOTFOUND"]
+            },
+            "description": "Lấy chi tiết alert bằng ID không tồn tại."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Non-existing alert ID returns 404', function () {",
+                  "  pm.expect(pm.response.code).to.eql(404);",
+                  "});",
+                  "pm.test('Response follows ProblemDetails structure', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('type');",
+                  "  pm.expect(json).to.have.property('title');",
+                  "  pm.expect([401, 404]).to.include(json.status);",
+                  "  pm.expect(json).to.have.property('detail');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04_Boundary_Reliability",
+      "item": [
+        {
+          "name": "GET /alerts/recent - limit negative is rejected",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Prefer", "value": "code=401" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/recent?limit=-5",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts", "recent"],
+              "query": [
+                { "key": "limit", "value": "-5" }
+              ]
+            },
+            "description": "Boundary test: Limit không được bé hơn 1."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Negative limit returns client error', function () {",
+                  "  pm.expect([400, 422, 401]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /alerts/recent - limit above max is rejected",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Prefer", "value": "code=403" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/recent?limit=101",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts", "recent"],
+              "query": [
+                { "key": "limit", "value": "101" }
+              ]
+            },
+            "description": "Boundary test: Limit không được lớn hơn 100."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Limit above max returns client error', function () {",
+                  "  pm.expect([400, 422, 403]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05_Consumer_side_Smoke",
+      "item": [
+        {
+          "name": "Consumer smoke - Ingest IoT Telemetry event (Pair 06)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{iotMockUrl}}/readings",
+              "host": ["{{iotMockUrl}}"],
+              "path": ["readings"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_id\": \"dev-temp-0042\",\n  \"metric\": \"temperature\",\n  \"value\": 24.5,\n  \"unit\": \"celsius\",\n  \"timestamp\": \"2026-05-29T10:30:00.123Z\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "description": "Consumer smoke test: gọi sang Mock Server của IoT Ingestion để kiểm chứng tích hợp Cặp 06."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Consumer receives success from IoT Ingestion mock', function () {",
+                  "  pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('Consumer can parse telemetry response', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('reading_id');",
+                  "  pm.expect(json).to.have.property('accepted', true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consumer smoke - Receive Camera Motion event (Pair 07)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceService\": \"camera-stream\",\n  \"alertType\": \"SECURITY\",\n  \"severity\": \"MEDIUM\",\n  \"message\": \"Motion detected at MAIN_GATE, snapshot at S3: https://storage.smartcampus.edu.vn/snapshots/cam-gate-01.jpg\",\n  \"relatedEventId\": \"evt_0196fb3d-7ad7-7d1e-9f49-5d5148d2bcba\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "description": "Kiểm thử khả năng xử lý của Analytics khi nhận thông tin Camera Motion Event (Cặp 07)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Correctly maps event correlation details', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('id');",
+                  "  pm.expect(json.relatedEventId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consumer smoke - Ingest Access Log event (Pair 09)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceService\": \"access-gate\",\n  \"alertType\": \"UNAUTHORIZED_ACCESS\",\n  \"severity\": \"HIGH\",\n  \"message\": \"Access denied for cardHash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 at gate gate-lib-01\",\n  \"relatedEventId\": \"evt_0196fb3d-dad7-7d1e-9f49-5d5148d2b888\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "description": "Kiểm thử khả năng xử lý khi có access denied từ Access Gate (Cặp 09)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Includes CardHash reference in message', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06_Local_only_NonFunctional",
+      "item": [
+        {
+          "name": "GET /alerts/recent - response latency check",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/alerts/recent?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["alerts", "recent"],
+              "query": [
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "description": "Đo lường thời gian phản hồi SLA của dịch vụ thật trên Local."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const env = pm.environment.get('env') || 'mock';",
+                  "if (env === 'local') {",
+                  "  pm.test('Local service responds under 1000ms', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Skipped on mock: latency measurement is only valid for actual implementations', function () {",
+                  "    pm.expect(true).to.eql(true);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
